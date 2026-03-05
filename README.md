@@ -146,5 +146,3 @@ It works completely offline after the page loads.
 
 - Pure HTML/CSS/JS, no frameworks or libraries
 - Line-by-line regex-based conversion (not full YAML parsing) to preserve formatting, comments, and YAML anchors/aliases
-- Dark theme matching the Home Assistant aesthetic
-- Responsive layout (stacks vertically on mobile)

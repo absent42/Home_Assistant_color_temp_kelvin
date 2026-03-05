@@ -132,16 +132,6 @@ These are flagged red with a comment. You need to trace where the value comes fr
 
 If you have a custom sensor or entity that happens to use `color_temp`, `min_mireds`, or `max_mireds` as attribute names for non-light purposes, the tool may incorrectly rename them. Review yellow-flagged changes carefully.
 
-## Hosting
-
-The tool is a single `index.html` file with no external dependencies. You can:
-
-- Open it directly in your browser from your filesystem
-- Host it on GitHub Pages
-- Put it on any static file server
-
-It works completely offline after the page loads.
-
 ## Technical Details
 
 - Pure HTML/CSS/JS, no frameworks or libraries

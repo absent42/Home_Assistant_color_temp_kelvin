@@ -2,6 +2,8 @@
 
 A single-page web tool that converts deprecated Home Assistant light color temperature YAML to the new format introduced in HA 2026.3.
 
+Download and run locally, or use the online version here: https://absent42.github.io/Home_Assistant_color_temp_kelvin/
+
 ## Background
 
 Home Assistant 2026.3 ([details](https://developers.home-assistant.io/blog/2026/02/23/remove-deprecate-light-features/)) removed several light entity attributes and service call parameters:

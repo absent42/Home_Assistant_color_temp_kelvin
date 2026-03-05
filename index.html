@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Assistant Color Temp Migration Tool</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #1c1c1c;
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .description {
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .description a {
+      color: #03a9f4;
+      text-decoration: none;
+    }
+
+    .description a:hover {
+      text-decoration: underline;
+    }
+
+    .description code {
+      background: #333;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    .panels {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+    }
+
+    .panel {
+      flex: 1 1 0;
+      min-width: 0;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .panel label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    textarea#input {
+      width: 100%;
+      min-height: 460px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 12px;
+      resize: vertical;
+    }
+
+    pre#output-pre {
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 0;
+      min-height: 460px;
+      overflow: auto;
+      white-space: pre;
+      max-width: 100%;
+    }
+
+    .button-bar {
+      display: flex;
+      flex-direction: row;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .button-bar button {
+      padding: 10px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    #convertBtn {
+      background: #03a9f4;
+      color: #ffffff;
+    }
+
+    #convertBtn:hover {
+      background: #0288d1;
+    }
+
+    #copyBtn {
+      background: #555;
+      color: #e0e0e0;
+    }
+
+    #copyBtn:hover {
+      background: #666;
+    }
+
+    #summary {
+      display: none;
+      background: #2a2a2a;
+      border-top: 2px solid #444;
+      padding: 16px;
+      margin-top: 20px;
+      border-radius: 6px;
+    }
+
+    .change-green { color: #4caf50; }
+    .change-yellow { color: #ff9800; }
+    .change-red { color: #f44336; }
+
+    .line-green { background: rgba(76, 175, 80, 0.15); }
+    .line-yellow { background: rgba(255, 152, 0, 0.15); }
+    .line-red { background: rgba(244, 67, 54, 0.15); }
+
+    .summary-counts p {
+      margin: 4px 0;
+      font-size: 15px;
+    }
+
+    .summary-details {
+      margin-top: 12px;
+    }
+
+    .change-detail {
+      padding: 4px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #333;
+    }
+
+    @media (max-width: 768px) {
+      .panels {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Home Assistant Color Temp Migration Tool</h1>
+    <p class="description">
+      Home Assistant 2026.3 removed <code>color_temp</code> (mireds), <code>kelvin</code>,
+      <code>min_mireds</code>, and <code>max_mireds</code> in favor of
+      <code>color_temp_kelvin</code>. Paste your YAML below to convert it automatically.
+      <a href="https://developers.home-assistant.io/blog/2026/02/23/remove-deprecate-light-features/" target="_blank" rel="noopener">Learn more</a>
+    </p>
+
+    <div style="margin-bottom: 16px;">
+      <label style="cursor: pointer; font-size: 14px;">
+        <input type="checkbox" id="autoConvertComparisons" checked style="margin-right: 6px; accent-color: #03a9f4;">
+        Auto-convert mired values in comparisons (e.g. <code style="background:#333; padding:2px 5px; border-radius:3px; font-size:0.9em;">&gt; 300</code> becomes <code style="background:#333; padding:2px 5px; border-radius:3px; font-size:0.9em;">&gt; 3333</code>)
+      </label>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label for="input" style="margin-bottom: 0;">Input</label>
+          <button id="loadExampleBtn" style="background: none; border: none; color: #03a9f4; cursor: pointer; font-size: 12px; padding: 0;">Load Example</button>
+        </div>
+        <textarea id="input" placeholder="Paste your YAML here..." rows="20"></textarea>
+      </div>
+      <div class="panel">
+        <label>Output</label>
+        <pre id="output-pre"><code id="output"></code></pre>
+      </div>
+    </div>
+
+    <div class="button-bar">
+      <button id="convertBtn">Convert</button>
+      <button id="copyBtn">Copy Result</button>
+    </div>
+
+    <div id="summary">
+      <div class="summary-counts"></div>
+      <div class="summary-details"></div>
+    </div>
+  </div>
+<script>
+// ============================================================
+// Conversion Engine - Tasks 2, 3, 4
+// ============================================================
+
+function convert(input) {
+  var lines = input.split('\n');
+  var changes = [];
+  var outputLines = lines.map(function(line, i) {
+    return processLine(line, i + 1, changes);
+  });
+  return { outputText: outputLines.join('\n'), changes: changes };
+}
+
+function processLine(line, lineNum, changes) {
+  // Skip comment-only lines
+  if (line.trimStart().startsWith('#')) return line;
+
+  var result;
+
+  // Rule 1: color_temp: <number>
+  result = convertColorTempLiteral(line, lineNum);
+  if (result) { changes.push(result.change); return result.line; }
+
+  // Rule 4: kelvin: <number or template>
+  result = convertKelvin(line, lineNum);
+  if (result) { changes.push(result.change); return result.line; }
+
+  // Rule 2: color_temp: "{{ template }}"
+  result = convertColorTempTemplate(line, lineNum);
+  if (result) { changes.push(result.change); return result.line; }
+
+  // Rule 3: color_temp: !input or other dynamic
+  result = convertColorTempDynamic(line, lineNum);
+  if (result) { changes.push(result.change); return result.line; }
+
+  // Rule 5: attribute reads in templates
+  result = convertAttributeReads(line, lineNum);
+  if (result) { changes.push.apply(changes, result.changes); return result.line; }
+
+  return line;
+}
+
+// ------------------------------------------------------------------
+// Rule 1 - color_temp: <literal number> (mireds -> Kelvin)
+// ------------------------------------------------------------------
+function convertColorTempLiteral(line, lineNum) {
+  var re = /^(\s*)(color_temp)\s*:\s*(\d+\.?\d*)\s*(#.*)?$/;
+  var m = re.exec(line);
+  if (!m) return null;
+
+  var indent = m[1];
+  var mireds = parseFloat(m[3]);
+  var comment = m[4] || '';
+  var kelvin = Math.round(1000000 / mireds);
+
+  var converted = indent + 'color_temp_kelvin: ' + kelvin;
+  if (comment) converted += '  ' + comment;
+
+  return {
+    line: converted,
+    change: {
+      line: lineNum,
+      type: 'green',
+      before: line.trim(),
+      after: converted.trim(),
+      description: 'color_temp: ' + m[3] + ' (mireds) -> color_temp_kelvin: ' + kelvin + ' (Kelvin)'
+    }
+  };
+}
+
+// ------------------------------------------------------------------
+// Rule 4 - kelvin: <value> -> color_temp_kelvin: <value>
+// ------------------------------------------------------------------
+function convertKelvin(line, lineNum) {
+  // Sub-pattern A: literal number
+  var reLit = /^(\s*)(kelvin)\s*:\s*(\d+\.?\d*)\s*(#.*)?$/;
+  var m = reLit.exec(line);
+  if (m) {
+    var indent = m[1];
+    var value = m[3];
+    var comment = m[4] || '';
+    var converted = indent + 'color_temp_kelvin: ' + value;
+    if (comment) converted += '  ' + comment;
+    return {
+      line: converted,
+      change: {
+        line: lineNum,
+        type: 'green',
+        before: line.trim(),
+        after: converted.trim(),
+        description: 'kelvin: ' + value + ' -> color_temp_kelvin: ' + value + ' (renamed)'
+      }
+    };
+  }
+
+  // Sub-pattern B: template value
+  var reTpl = /^(\s*)(kelvin)\s*:\s*(["']?\{\{.*\}\}["']?)\s*(#.*)?$/;
+  m = reTpl.exec(line);
+  if (m) {
+    var indent = m[1];
+    var tplValue = m[3];
+    var comment = m[4] || '';
+    var converted = indent + 'color_temp_kelvin: ' + tplValue;
+    if (comment) converted += '  ' + comment;
+    return {
+      line: converted,
+      change: {
+        line: lineNum,
+        type: 'green',
+        before: line.trim(),
+        after: converted.trim(),
+        description: 'kelvin: (template) -> color_temp_kelvin: (template) (renamed)'
+      }
+    };
+  }
+
+  return null;
+}
+
+// ------------------------------------------------------------------
+// Rule 2 - color_temp: "{{ template }}" (rename to color_temp_kelvin)
+// ------------------------------------------------------------------
+function convertColorTempTemplate(line, lineNum) {
+  var re = /^(\s*)(color_temp)\s*:\s*(["']?\{\{.*\}\}["']?)\s*(#.*)?$/;
+  var m = re.exec(line);
+  if (!m) return null;
+
+  var indent = m[1];
+  var tplValue = m[3];
+  var comment = m[4] || '';
+
+  // Also replace attribute references inside the template
+  var attrMap = {
+    "'color_temp'": "'color_temp_kelvin'",
+    '"color_temp"': '"color_temp_kelvin"',
+    "'min_mireds'": "'min_color_temp_kelvin'",
+    '"min_mireds"': '"min_color_temp_kelvin"',
+    "'max_mireds'": "'max_color_temp_kelvin'",
+    '"max_mireds"': '"max_color_temp_kelvin"'
+  };
+  var keys = Object.keys(attrMap);
+  for (var i = 0; i < keys.length; i++) {
+    tplValue = tplValue.split(keys[i]).join(attrMap[keys[i]]);
+  }
+  tplValue = tplValue.replace(/attributes\.color_temp/g, 'attributes.color_temp_kelvin');
+  tplValue = tplValue.replace(/attributes\.min_mireds/g, 'attributes.min_color_temp_kelvin');
+  tplValue = tplValue.replace(/attributes\.max_mireds/g, 'attributes.max_color_temp_kelvin');
+
+  var converted = indent + 'color_temp_kelvin: ' + tplValue;
+  if (comment) converted += '  ' + comment;
+
+  return {
+    line: converted,
+    change: {
+      line: lineNum,
+      type: 'yellow',
+      before: line.trim(),
+      after: converted.trim(),
+      description: 'color_temp -> color_temp_kelvin (renamed) - if template returns mireds, add conversion math manually'
+    }
+  };
+}
+
+
+// ------------------------------------------------------------------
+// Rule 3 - color_temp: <dynamic / unhandled> (FIXME comment)
+// ------------------------------------------------------------------
+function convertColorTempDynamic(line, lineNum) {
+  var re = /^(\s*)(color_temp)\s*:\s*(.+)$/;
+  var m = re.exec(line);
+  if (!m) return null;
+
+  var value = m[3].trim();
+
+  // Guard: already handled by Rule 1 (numeric)
+  if (/^\d+\.?\d*\s*(#.*)?$/.test(value)) return null;
+
+  // Guard: already handled by Rule 2 (template)
+  if (/^["']?\{\{.*\}\}["']?\s*(#.*)?$/.test(value)) return null;
+
+  var converted = line.replace('color_temp:', 'color_temp_kelvin:') + '  # MANUAL FIX NEEDED: renamed key, but ensure the value provides Kelvin (not mireds). If mireds, wrap with: {{ (1000000 / VALUE | float) | round(0) | int }}';
+
+  return {
+    line: converted,
+    change: {
+      line: lineNum,
+      type: 'red',
+      before: line.trim(),
+      after: converted.trim(),
+      description: 'Renamed to color_temp_kelvin but value may need conversion - check if "' + value + '" provides Kelvin or mireds'
+    }
+  };
+}
+
+// ------------------------------------------------------------------
+// Rule 5 - Attribute reads in templates
+// ------------------------------------------------------------------
+function convertAttributeReads(line, lineNum) {
+  var attrMap = {
+    'color_temp': 'color_temp_kelvin',
+    'min_mireds': 'min_color_temp_kelvin',
+    'max_mireds': 'max_color_temp_kelvin'
+  };
+
+  var changesArr = [];
+  var modified = line;
+
+  var oldAttrs = Object.keys(attrMap);
+  for (var i = 0; i < oldAttrs.length; i++) {
+    var oldAttr = oldAttrs[i];
+    var newAttr = attrMap[oldAttr];
+
+    // Quoted strings: 'old_attr' or "old_attr"
+    var reSingle = new RegExp("'" + oldAttr + "'", 'g');
+    var reDouble = new RegExp('"' + oldAttr + '"', 'g');
+
+    // Dot access: attributes.old_attr (word boundary after)
+    var reDot = new RegExp('attributes\\.' + oldAttr + '\\b', 'g');
+
+    var hadMatch = false;
+    var before = modified;
+
+    modified = modified.replace(reSingle, "'" + newAttr + "'");
+    modified = modified.replace(reDouble, '"' + newAttr + '"');
+    modified = modified.replace(reDot, 'attributes.' + newAttr);
+    if (modified !== before) hadMatch = true;
+
+    if (hadMatch) {
+      // Auto-convert mired comparison values if checkbox is checked
+      var autoConvert = document.getElementById('autoConvertComparisons').checked;
+      if (autoConvert) {
+        // Match comparison operators followed by numbers: > 300, < 200, >= 153, <= 500, == 250
+        modified = modified.replace(/(>|<|>=|<=|==|!=)\s*(\d+\.?\d*)/g, function(match, op, num) {
+          var miredVal = parseFloat(num);
+          // Only convert values in typical mired range (100-600)
+          if (miredVal >= 100 && miredVal <= 600) {
+            var kelvinVal = Math.round(1000000 / miredVal);
+            return op + ' ' + kelvinVal;
+          }
+          return match;
+        });
+      }
+
+      var desc;
+      if (autoConvert) {
+        desc = 'Attribute reference: ' + oldAttr + ' -> ' + newAttr + ' (comparison values also converted from mireds to Kelvin)';
+      } else {
+        desc = 'Attribute reference: ' + oldAttr + ' -> ' + newAttr + ' - WARNING: this attribute now returns Kelvin instead of mireds. Any comparisons or math using this value will need updating (e.g. > 300 mireds would be > 3333 Kelvin)';
+      }
+
+      changesArr.push({
+        line: lineNum,
+        type: 'yellow',
+        before: line.trim(),
+        after: modified.trim(),
+        description: desc
+      });
+    }
+  }
+
+  if (changesArr.length === 0) return null;
+
+  return { line: modified, changes: changesArr };
+}
+
+// ============================================================
+// UI Wiring - Tasks 5, 6
+// ============================================================
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function displayOutput(outputText, changes) {
+  // Build a map of lineNum -> highest-priority change type
+  var lineTypeMap = {};
+  var priority = { green: 1, yellow: 2, red: 3 };
+  for (var i = 0; i < changes.length; i++) {
+    var c = changes[i];
+    var existing = lineTypeMap[c.line];
+    if (!existing || priority[c.type] > priority[existing]) {
+      lineTypeMap[c.line] = c.type;
+    }
+  }
+
+  var lines = outputText.split('\n');
+  var html = '';
+  for (var j = 0; j < lines.length; j++) {
+    var lineNum = j + 1;
+    var padded = ('    ' + lineNum).slice(-4);
+    var escaped = escapeHtml(lines[j]);
+    var type = lineTypeMap[lineNum];
+    if (type) {
+      html += '<span class="line-' + type + '">' + padded + ' | ' + escaped + '</span>\n';
+    } else {
+      html += padded + ' | ' + escaped + '\n';
+    }
+  }
+
+  document.getElementById('output').innerHTML = html;
+}
+
+function displaySummary(changes) {
+  var summary = document.getElementById('summary');
+  summary.style.display = 'block';
+
+  var countsEl = summary.querySelector('.summary-counts');
+  var detailsEl = summary.querySelector('.summary-details');
+
+  if (changes.length === 0) {
+    countsEl.innerHTML = '<p>No deprecated color_temp references found.</p>';
+    detailsEl.innerHTML = '';
+    return;
+  }
+
+  var greenCount = 0, yellowCount = 0, redCount = 0;
+  for (var i = 0; i < changes.length; i++) {
+    if (changes[i].type === 'green') greenCount++;
+    else if (changes[i].type === 'yellow') yellowCount++;
+    else if (changes[i].type === 'red') redCount++;
+  }
+
+  var countsHtml = '';
+  if (greenCount > 0) countsHtml += '<p class="change-green">&#10004; ' + greenCount + ' auto-converted</p>';
+  if (yellowCount > 0) countsHtml += '<p class="change-yellow">&#9888; ' + yellowCount + ' converted - review recommended</p>';
+  if (redCount > 0) countsHtml += '<p class="change-red">&#10008; ' + redCount + ' need manual attention</p>';
+  countsEl.innerHTML = countsHtml;
+
+  var detailsHtml = '';
+  for (var j = 0; j < changes.length; j++) {
+    var c = changes[j];
+    detailsHtml += '<div class="change-detail change-' + c.type + '"><strong>Line ' + c.line + ':</strong> ' + escapeHtml(c.description) + '</div>';
+  }
+  detailsEl.innerHTML = detailsHtml;
+}
+
+// Convert button
+document.getElementById('convertBtn').addEventListener('click', function() {
+  var input = document.getElementById('input').value;
+  if (!input.trim()) return;
+  var result = convert(input);
+  displayOutput(result.outputText, result.changes);
+  displaySummary(result.changes);
+});
+
+// Copy button
+document.getElementById('copyBtn').addEventListener('click', function() {
+  var input = document.getElementById('input').value;
+  if (!input.trim()) return;
+  var result = convert(input);
+  var btn = document.getElementById('copyBtn');
+  navigator.clipboard.writeText(result.outputText).then(function() {
+    btn.textContent = 'Copied!';
+    setTimeout(function() {
+      btn.textContent = 'Copy Result';
+    }, 2000);
+  });
+});
+
+// Load Example button
+document.getElementById('loadExampleBtn').addEventListener('click', function() {
+  document.getElementById('input').value = "# Example automation with deprecated color_temp values\nautomation:\n  - alias: \"Evening warm lights\"\n    trigger:\n      - platform: sun\n        event: sunset\n    action:\n      - service: light.turn_on\n        data:\n          entity_id: light.living_room\n          color_temp: 370\n          brightness: 200\n      - service: light.turn_on\n        data:\n          entity_id: light.bedroom\n          kelvin: 3000\n      - service: light.turn_on\n        data:\n          color_temp: \"{{ states(\'input_number.color_temp\') | int }}\"\n      - service: light.turn_on\n        data:\n          color_temp: !input user_color_temp\n\n  - alias: \"Check light temperature\"\n    trigger:\n      - platform: template\n        value_template: \"{{ state_attr(\'light.desk\', \'color_temp\') > 300 }}\"\n    condition:\n      - condition: template\n        value_template: \"{{ state_attr(\'light.desk\', \'min_mireds\') < 200 }}\"\n    action:\n      - service: notify.mobile\n        data:\n          message: \"Temp is {{ trigger.to_state.attributes.max_mireds }}\"";
+});
+</script>
+</body>
+</html>

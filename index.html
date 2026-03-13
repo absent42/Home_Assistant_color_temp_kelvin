@@ -596,7 +596,15 @@ document.getElementById('copyBtn').addEventListener('click', function() {
 
 // Load Example button
 document.getElementById('loadExampleBtn').addEventListener('click', function() {
-  document.getElementById('input').value = "# Example automation with deprecated color_temp values\nautomation:\n  - alias: \"Evening warm lights\"\n    trigger:\n      - platform: sun\n        event: sunset\n    action:\n      - service: light.turn_on\n        data:\n          entity_id: light.living_room\n          color_temp: 370\n          brightness: 200\n      - service: light.turn_on\n        data:\n          entity_id: light.bedroom\n          kelvin: 3000\n      - service: light.turn_on\n        data:\n          color_temp: \"{{ states(\'input_number.color_temp\') | int }}\"\n      - service: light.turn_on\n        data:\n          color_temp: !input user_color_temp\n\n  - alias: \"Check light temperature\"\n    trigger:\n      - platform: template\n        value_template: \"{{ state_attr(\'light.desk\', \'color_temp\') > 300 }}\"\n    condition:\n      - condition: template\n        value_template: \"{{ state_attr(\'light.desk\', \'min_mireds\') < 200 }}\"\n    action:\n      - service: notify.mobile\n        data:\n          message: \"Temp is {{ trigger.to_state.attributes.max_mireds }}\"";
+  document.getElementById('input').value = "# Example automation with deprecated color_temp values\nautomation:\n  - alias: \"Evening warm lights\"\n    trigger:\n      - platform: sun\n        event: sunset\n    action:\n      - service: light.turn_on\n        data:\n          entity_id: light.living_room\n          color_temp: 370\n          brightness: 200\n      - service: light.turn_on\n        data:\n          entity_id: light.bedroom\n          kelvin: 3000\n      - service: light.turn_on\n        data:\n          color_temp: \"{{ states(\'input_number.color_temp\') | int }}\"\n      - service: light.turn_on\n        data:\n          color_temp: !input user_color_temp\n\n  - alias: \"Check light temperature\"\n    trigger:\n      - platform: template\n        value_template: \"{{ state_attr(\'light.desk\', \'color_temp\') > 300 }}\"\n    condition:\n      - condition: template\n        value_template: \"{{ state_attr(\'light.desk\', \'min_mireds\') < 200 }}\"\n    action:\n      - service: notify.mobile\n        data:\n          message: \"Temp is {{ trigger.to_state.attributes.max_mireds }}\"
+
+  - alias: \"Yeelight scene (kelvin is valid here)\"
+    action:
+      - service: yeelight.set_color_temp_scene
+        data:
+          entity_id: light.yeelight_bulb
+          kelvin: 4000
+          brightness: 100";
 });
 </script>
 </body>

@@ -234,13 +234,17 @@
 function convert(input) {
   var lines = input.split('\n');
   var changes = [];
+  var lastService = '';
   var outputLines = lines.map(function(line, i) {
-    return processLine(line, i + 1, changes);
+    // Track the most recent service: declaration for context
+    var svcMatch = /^\s*service:\s*([\w.]+)/.exec(line);
+    if (svcMatch) lastService = svcMatch[1];
+    return processLine(line, i + 1, changes, lastService);
   });
   return { outputText: outputLines.join('\n'), changes: changes };
 }
 
-function processLine(line, lineNum, changes) {
+function processLine(line, lineNum, changes, lastService) {
   // Skip comment-only lines
   if (line.trimStart().startsWith('#')) return line;
 
@@ -251,8 +255,12 @@ function processLine(line, lineNum, changes) {
   if (result) { changes.push(result.change); return result.line; }
 
   // Rule 4: kelvin: <number or template>
-  result = convertKelvin(line, lineNum);
-  if (result) { changes.push(result.change); return result.line; }
+  // Skip for non-core services (e.g. yeelight.*) where kelvin is still valid
+  var isCoreService = !lastService || lastService.startsWith('light.');
+  if (isCoreService) {
+    result = convertKelvin(line, lineNum);
+    if (result) { changes.push(result.change); return result.line; }
+  }
 
   // Rule 2: color_temp: "{{ template }}"
   result = convertColorTempTemplate(line, lineNum);

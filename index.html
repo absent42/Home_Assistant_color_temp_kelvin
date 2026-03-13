@@ -145,10 +145,12 @@
     .change-green { color: #4caf50; }
     .change-yellow { color: #ff9800; }
     .change-red { color: #f44336; }
+    .change-blue { color: #64b5f6; }
 
     .line-green { background: rgba(76, 175, 80, 0.15); }
     .line-yellow { background: rgba(255, 152, 0, 0.15); }
     .line-red { background: rgba(244, 67, 54, 0.15); }
+    .line-blue { background: rgba(100, 181, 246, 0.15); }
 
     .summary-counts p {
       margin: 4px 0;
@@ -237,7 +239,7 @@ function convert(input) {
   var lastService = '';
   var outputLines = lines.map(function(line, i) {
     // Track the most recent service: declaration for context
-    var svcMatch = /^\s*service:\s*([\w.]+)/.exec(line);
+    var svcMatch = /^\s*-?\s*service:\s*([\w.]+)/.exec(line);
     if (svcMatch) lastService = svcMatch[1];
     return processLine(line, i + 1, changes, lastService);
   });
@@ -260,6 +262,19 @@ function processLine(line, lineNum, changes, lastService) {
   if (isCoreService) {
     result = convertKelvin(line, lineNum);
     if (result) { changes.push(result.change); return result.line; }
+  } else {
+    // Check if this line has kelvin: and record that it was intentionally skipped
+    var reKelvinCheck = /^\s*(kelvin)\s*:\s*.+$/;
+    if (reKelvinCheck.test(line)) {
+      changes.push({
+        line: lineNum,
+        type: 'blue',
+        before: line.trim(),
+        after: line.trim(),
+        description: 'Skipped: kelvin is valid for ' + lastService + ' (not a core light service)'
+      });
+      return line;
+    }
   }
 
   // Rule 2: color_temp: "{{ template }}"
@@ -511,7 +526,7 @@ function escapeHtml(str) {
 function displayOutput(outputText, changes) {
   // Build a map of lineNum -> highest-priority change type
   var lineTypeMap = {};
-  var priority = { green: 1, yellow: 2, red: 3 };
+  var priority = { blue: 0, green: 1, yellow: 2, red: 3 };
   for (var i = 0; i < changes.length; i++) {
     var c = changes[i];
     var existing = lineTypeMap[c.line];
@@ -550,17 +565,22 @@ function displaySummary(changes) {
     return;
   }
 
-  var greenCount = 0, yellowCount = 0, redCount = 0;
+  // If only skips and no actual changes, still show the summary
+
+
+  var greenCount = 0, yellowCount = 0, redCount = 0, blueCount = 0;
   for (var i = 0; i < changes.length; i++) {
     if (changes[i].type === 'green') greenCount++;
     else if (changes[i].type === 'yellow') yellowCount++;
     else if (changes[i].type === 'red') redCount++;
+    else if (changes[i].type === 'blue') blueCount++;
   }
 
   var countsHtml = '';
   if (greenCount > 0) countsHtml += '<p class="change-green">&#10004; ' + greenCount + ' auto-converted</p>';
   if (yellowCount > 0) countsHtml += '<p class="change-yellow">&#9888; ' + yellowCount + ' converted - review recommended</p>';
   if (redCount > 0) countsHtml += '<p class="change-red">&#10008; ' + redCount + ' need manual attention</p>';
+  if (blueCount > 0) countsHtml += '<p class="change-blue">&#10140; ' + blueCount + ' skipped (non-core service)</p>';
   countsEl.innerHTML = countsHtml;
 
   var detailsHtml = '';
@@ -596,15 +616,7 @@ document.getElementById('copyBtn').addEventListener('click', function() {
 
 // Load Example button
 document.getElementById('loadExampleBtn').addEventListener('click', function() {
-  document.getElementById('input').value = "# Example automation with deprecated color_temp values\nautomation:\n  - alias: \"Evening warm lights\"\n    trigger:\n      - platform: sun\n        event: sunset\n    action:\n      - service: light.turn_on\n        data:\n          entity_id: light.living_room\n          color_temp: 370\n          brightness: 200\n      - service: light.turn_on\n        data:\n          entity_id: light.bedroom\n          kelvin: 3000\n      - service: light.turn_on\n        data:\n          color_temp: \"{{ states(\'input_number.color_temp\') | int }}\"\n      - service: light.turn_on\n        data:\n          color_temp: !input user_color_temp\n\n  - alias: \"Check light temperature\"\n    trigger:\n      - platform: template\n        value_template: \"{{ state_attr(\'light.desk\', \'color_temp\') > 300 }}\"\n    condition:\n      - condition: template\n        value_template: \"{{ state_attr(\'light.desk\', \'min_mireds\') < 200 }}\"\n    action:\n      - service: notify.mobile\n        data:\n          message: \"Temp is {{ trigger.to_state.attributes.max_mireds }}\"
-
-  - alias: \"Yeelight scene (kelvin is valid here)\"
-    action:
-      - service: yeelight.set_color_temp_scene
-        data:
-          entity_id: light.yeelight_bulb
-          kelvin: 4000
-          brightness: 100";
+  document.getElementById('input').value = "# Example automation with deprecated color_temp values\nautomation:\n  - alias: \"Evening warm lights\"\n    trigger:\n      - platform: sun\n        event: sunset\n    action:\n      - service: light.turn_on\n        data:\n          entity_id: light.living_room\n          color_temp: 370\n          brightness: 200\n      - service: light.turn_on\n        data:\n          entity_id: light.bedroom\n          kelvin: 3000\n      - service: light.turn_on\n        data:\n          color_temp: \"{{ states(\'input_number.color_temp\') | int }}\"\n      - service: light.turn_on\n        data:\n          color_temp: !input user_color_temp\n\n  - alias: \"Check light temperature\"\n    trigger:\n      - platform: template\n        value_template: \"{{ state_attr(\'light.desk\', \'color_temp\') > 300 }}\"\n    condition:\n      - condition: template\n        value_template: \"{{ state_attr(\'light.desk\', \'min_mireds\') < 200 }}\"\n    action:\n      - service: notify.mobile\n        data:\n          message: \"Temp is {{ trigger.to_state.attributes.max_mireds }}\"\n\n  - alias: \"Yeelight scene (kelvin is valid here)\"\n    action:\n      - service: yeelight.set_color_temp_scene\n        data:\n          entity_id: light.yeelight_bulb\n          kelvin: 4000\n          brightness: 100";
 });
 </script>
 </body>
